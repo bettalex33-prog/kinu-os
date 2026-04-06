@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CYMATICS — Sound Made Visible</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Space+Mono:ital@0;1&display=swap');
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #020408; font-family: 'Space Mono', monospace; overflow: hidden; height: 100vh; width: 100vw; cursor: none; }
+  #canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+  #freq-bar { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; z-index: 5; opacity: 0.35; }
+
+  .top-left { position: fixed; top: 22px; left: 24px; z-index: 10; }
+  .title { font-family: 'Syncopate', sans-serif; font-weight: 700; font-size: clamp(1rem, 2.5vw, 1.8rem); letter-spacing: 0.5em; text-shadow: 0 0 30px currentColor, 0 0 60px currentColor; transition: color 0.6s; }
+  .subtitle { font-size: 0.55rem; letter-spacing: 0.35em; margin-top: 3px; opacity: 0.35; transition: color 0.6s; }
+
+  .top-center { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .badge { font-size: 0.6rem; letter-spacing: 0.4em; padding: 5px 16px; border: 1px solid; border-radius: 2px; text-transform: uppercase; white-space: nowrap; transition: color 0.6s, border-color 0.6s, background 0.6s; }
+  .badge.demo { opacity: 0.8; }
+  .badge.live { animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .mic-meter { display: flex; gap: 3px; align-items: flex-end; height: 22px; }
+  .mic-bar { width: 4px; border-radius: 1px; min-height: 2px; height: 2px; transition: height 0.06s ease; }
+
+  .top-right { position: fixed; top: 22px; right: 24px; z-index: 10; text-align: right; font-size: 0.55rem; letter-spacing: 0.15em; opacity: 0.4; line-height: 2; transition: color 0.6s; }
+
+  /* ── THEME SWITCHER ── */
+  .theme-bar {
+    position: fixed; left: 28px; top: 50%; transform: translateY(-50%);
+    z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .theme-label { font-size: 0.42rem; letter-spacing: 0.3em; opacity: 0.3; writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); margin-bottom: 4px; transition: color 0.6s; }
+  .theme-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; transition: transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+    position: relative;
+  }
+  .theme-btn:hover { transform: scale(1.2); }
+  .theme-btn.active { border-color: white; box-shadow: 0 0 12px rgba(255,255,255,0.5); transform: scale(1.15); }
+  .theme-btn.t-neon      { background: radial-gradient(circle, #00f5d4, #7b2fff); }
+  .theme-btn.t-fire      { background: radial-gradient(circle, #fff200, #ff4500); }
+  .theme-btn.t-ocean     { background: radial-gradient(circle, #00cfff, #003580); }
+  .theme-btn.t-mono      { background: radial-gradient(circle, #ffffff, #333333); }
+  .theme-btn.t-aurora    { background: radial-gradient(circle, #00ff88, #8800ff); }
+  .theme-name { font-size: 0.38rem; letter-spacing: 0.2em; opacity: 0.3; transition: color 0.6s; }
+
+  /* ── DIAL ── */
+  .dial-wrap { position: fixed; bottom: 105px; right: 28px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .dial-label { font-size: 0.48rem; letter-spacing: 0.3em; opacity: 0.4; text-transform: uppercase; transition: color 0.6s; }
+  .dial-value { font-size: 0.65rem; letter-spacing: 0.1em; text-align: center; transition: color 0.6s; }
+  .dial-hint { font-size: 0.4rem; letter-spacing: 0.2em; opacity: 0.2; text-align: center; transition: color 0.6s; }
+
+  /* ── CONTROLS ── */
+  .controls { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .ctrl-row { display: flex; align-items: center; gap: 10px; }
+  .btn { font-family: 'Space Mono', monospace; font-size: 0.58rem; letter-spacing: 0.15em; text-transform: uppercase; background: transparent; padding: 8px 16px; cursor: pointer; transition: all 0.25s; border: 1px solid; }
+  .row-label { font-size: 0.45rem; letter-spacing: 0.3em; opacity: 0.25; transition: color 0.6s; }
+  .sep { opacity: 0.2; font-size: 0.8rem; }
+
+  #cursor { position: fixed; width: 8px; height: 8px; border-radius: 50%; pointer-events: none; z-index: 999; transform: translate(-50%, -50%); transition: background 0.6s, box-shadow 0.6s; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<canvas id="freq-bar"></canvas>
+
+<div class="top-left">
+  <div class="title" id="title-text">CYMATICS</div>
+  <div class="subtitle" id="subtitle-text">Sound Made Visible</div>
+</div>
+
+<div class="top-center">
+  <div class="badge demo" id="badge">◎ DEMO MODE — click MIC INPUT to go live</div>
+  <div class="mic-meter">
+    <div class="mic-bar" id="mb0"></div><div class="mic-bar" id="mb1"></div>
+    <div class="mic-bar" id="mb2"></div><div class="mic-bar" id="mb3"></div>
+    <div class="mic-bar" id="mb4"></div><div class="mic-bar" id="mb5"></div>
+    <div class="mic-bar" id="mb6"></div><div class="mic-bar" id="mb7"></div>
+  </div>
+</div>
+
+<div class="top-right" id="stats-el">
+  FREQ &nbsp;— <span id="stat-freq">—</span> Hz<br>
+  AMP &nbsp;&nbsp;— <span id="stat-amp">—</span><br>
+  MODE — <span id="stat-mode">CHLADNI</span>
+</div>
+
+<!-- THEME SWITCHER -->
+<div class="theme-bar">
+  <div class="theme-label" id="theme-label">THEME</div>
+  <button class="theme-btn t-neon active" id="th-neon" title="Neon"></button>
+  <div class="theme-name" id="tname-neon">NEON</div>
+  <button class="theme-btn t-fire"  id="th-fire"  title="Fire"></button>
+  <div class="theme-name" id="tname-fire">FIRE</div>
+  <button class="theme-btn t-ocean" id="th-ocean" title="Ocean"></button>
+  <div class="theme-name" id="tname-ocean">OCEAN</div>
+  <button class="theme-btn t-mono"  id="th-mono"  title="Mono"></button>
+  <div class="theme-name" id="tname-mono">MONO</div>
+  <button class="theme-btn t-aurora" id="th-aurora" title="Aurora"></button>
+  <div class="theme-name" id="tname-aurora">AURORA</div>
+</div>
+
+<!-- DIAL -->
+<div class="dial-wrap">
+  <div class="dial-label" id="dial-label">Sensitivity</div>
+  <canvas id="dial-canvas" width="64" height="64" style="cursor:pointer"></canvas>
+  <div class="dial-value" id="dial-val">5.0</div>
+  <div class="dial-hint">drag up / down</div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row">
+    <button class="btn" id="btn-mic">⬤ MIC INPUT</button>
+    <span class="sep">|</span>
+    <span class="row-label">CLASSIC</span>
+    <button class="btn active" id="btn-chladni">CHLADNI</button>
+    <button class="btn" id="btn-ripple">RIPPLE</button>
+    <button class="btn" id="btn-lissajous">LISSAJOUS</button>
+  </div>
+  <div class="ctrl-row">
+    <span class="row-label">NEW</span>
+    <button class="btn" id="btn-faraday">FARADAY</button>
+    <button class="btn" id="btn-spiral">SPIRAL</button>
+    <button class="btn" id="btn-polar">POLAR</button>
+  </div>
+</div>
+
+<div id="cursor"></div>
+
+<script>
+// ── THEMES ─────────────────────────────────────────────────────────────────────
+const THEMES = {
+  neon: {
+    bg: [2,4,8],
+    // hue(fraction, audio) → hue value
+    hue: (f, a) => 170 + f*60 + (a.high||0)*60,
+    particleHue: (f, a) => 170 + f*200,
+    nodeColor: '0,245,212',
+    primary: '#00f5d4',
+    accent:  '#f72585',
+    mic:     '#ffd60a',
+    trail: 0.18,
+  },
+  fire: {
+    bg: [8,2,0],
+    hue: (f, a) => 10 + f*50 + (a.energy||0)*20,
+    particleHue: (f, a) => 20 + f*40 + (a.bass||0)*30,
+    nodeColor: '255,160,0',
+    primary: '#ff6a00',
+    accent:  '#fff200',
+    mic:     '#ff4500',
+    trail: 0.15,
+  },
+  ocean: {
+    bg: [0,4,12],
+    hue: (f, a) => 190 + f*40 + (a.mid||0)*30,
+    particleHue: (f, a) => 195 + f*30 + (a.high||0)*20,
+    nodeColor: '0,180,255',
+    primary: '#00cfff',
+    accent:  '#0044ff',
+    mic:     '#00cfff',
+    trail: 0.20,
+  },
+  mono: {
+    bg: [4,4,4],
+    hue: (f, a) => 0,   // will use lightness only
+    particleHue: (f, a) => 0,
+    nodeColor: '255,255,255',
+    primary: '#ffffff',
+    accent:  '#888888',
+    mic:     '#cccccc',
+    trail: 0.12,
+    mono: true,
+  },
+  aurora: {
+    bg: [0,6,4],
+    hue: (f, a) => 120 + f*180 + Math.sin(f*6)*(a.high||0)*80,
+    particleHue: (f, a) => 100 + f*260,
+    nodeColor: '0,255,140',
+    primary: '#00ff88',
+    accent:  '#8800ff',
+    mic:     '#00ff88',
+    trail: 0.16,
+  },
+};
+
+let theme = THEMES.neon;
+let themeName = 'neon';
+
+function applyThemeUI() {
+  const p = theme.primary, a = theme.accent;
+  // Title
+  document.getElementById('title-text').style.color = p;
+  document.getElementById('subtitle-text').style.color = p;
+  document.getElementById('stats-el').style.color = p;
+  document.getElementById('theme-label').style.color = p;
+  document.getElementById('dial-label').style.color = p;
+  document.getElementById('dial-val').style.color = p;
+  document.querySelector('.dial-hint').style.color = p;
+  document.querySelectorAll('.row-label').forEach(el => el.style.color = p);
+  document.querySelectorAll('.sep').forEach(el => el.style.color = p);
+
+  // Badge
+  const bg = badge.classList.contains('live');
+  badge.style.color = p;
+  badge.style.borderColor = p+'99';
+  badge.style.background = p+'14';
+
+  // Buttons
+  document.querySelectorAll('.btn').forEach(btn => {
+    if(btn.id==='btn-mic') return; // handled separately
+    btn.style.borderColor = p+'99';
+    btn.style.color = p;
+    btn.style.boxShadow = btn.classList.contains('active')
+      ? `0 0 22px ${p}88` : `0 0 8px ${p}22`;
+  });
+
+  // Mic button
+  const micBtn = document.getElementById('btn-mic');
+  const micColor = micActive ? p : theme.mic;
+  micBtn.style.borderColor = micColor+'bb';
+  micBtn.style.color = micColor;
+
+  // Cursor
+  document.getElementById('cursor').style.background = p;
+  document.getElementById('cursor').style.boxShadow = `0 0 12px ${p}`;
+
+  // Theme name labels
+  ['neon','fire','ocean','mono','aurora'].forEach(n => {
+    document.getElementById('tname-'+n).style.color = n===themeName ? '#fff' : '#ffffff44';
+  });
+
+  drawDial();
+}
+
+function setTheme(name) {
+  themeName = name;
+  theme = THEMES[name];
+  document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('th-'+name).classList.add('active');
+  applyThemeUI();
+}
+
+// ── Canvas + state ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const freqCanvas = document.getElementById('freq-bar');
+const fctx = freqCanvas.getContext('2d');
+const badge = document.getElementById('badge');
+const micBars = [0,1,2,3,4,5,6,7].map(i => document.getElementById('mb'+i));
+
+let W, H, cx, cy;
+let audioCtx, analyser, dataArray, freqArray;
+let micActive = false;
+let mode = 'chladni';
+let t = 0;
+const NUM_PARTICLES = 3000;
+const particles = [];
+const GRID = 80;
+let faradayGrid = new Float32Array(GRID*GRID);
+let faradayVel  = new Float32Array(GRID*GRID);
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function themeColor(frac, alpha, audio, lightnessOverride) {
+  const hue = theme.hue(frac, audio||{});
+  if (theme.mono) return `rgba(${Math.round(lightnessOverride||200)},${Math.round(lightnessOverride||200)},${Math.round(lightnessOverride||200)},${alpha})`;
+  const L = lightnessOverride || 65;
+  return `hsla(${hue},100%,${L}%,${alpha})`;
+}
+function particleColor(frac, alpha, audio) {
+  const hue = theme.particleHue(frac, audio||{});
+  if (theme.mono) { const v = Math.round(120+frac*135); return `rgba(${v},${v},${v},${alpha})`; }
+  return `hsla(${hue},100%,70%,${alpha})`;
+}
+function nodeGlow() { return theme.nodeColor; }
+
+// ── Sensitivity Dial ───────────────────────────────────────────────────────────
+let sensitivity = 5.0;
+const SENS_MIN = 0.5, SENS_MAX = 10.0;
+const dialCanvas = document.getElementById('dial-canvas');
+const dctx = dialCanvas.getContext('2d');
+let dialDragging = false, dialStartY = 0, dialStartVal = 5.0;
+
+function drawDial() {
+  const r=28, dc=32;
+  dctx.clearRect(0,0,64,64);
+  dctx.beginPath();
+  dctx.arc(dc,dc,r,0.75*Math.PI,2.25*Math.PI);
+  dctx.strokeStyle=theme.primary+'22';
+  dctx.lineWidth=4;dctx.lineCap='round';dctx.stroke();
+  const frac=(sensitivity-SENS_MIN)/(SENS_MAX-SENS_MIN);
+  const endAngle=0.75*Math.PI+frac*1.5*Math.PI;
+  dctx.beginPath();dctx.arc(dc,dc,r,0.75*Math.PI,endAngle);
+  dctx.strokeStyle=theme.primary;dctx.lineWidth=4;dctx.stroke();
+  dctx.beginPath();dctx.arc(dc,dc,r,0.75*Math.PI,endAngle);
+  dctx.strokeStyle=theme.primary+'44';dctx.lineWidth=8;dctx.stroke();
+  const nx=dc+Math.cos(endAngle)*r, ny=dc+Math.sin(endAngle)*r;
+  dctx.beginPath();dctx.arc(nx,ny,4,0,Math.PI*2);
+  dctx.fillStyle=theme.primary;
+  dctx.shadowColor=theme.primary;dctx.shadowBlur=8;
+  dctx.fill();dctx.shadowBlur=0;
+  dctx.beginPath();dctx.arc(dc,dc,3,0,Math.PI*2);
+  dctx.fillStyle=theme.primary+'55';dctx.fill();
+  document.getElementById('dial-val').textContent=sensitivity.toFixed(1);
+}
+
+dialCanvas.addEventListener('mousedown', e=>{dialDragging=true;dialStartY=e.clientY;dialStartVal=sensitivity;});
+document.addEventListener('mousemove', e=>{
+  if(!dialDragging) return;
+  sensitivity=Math.max(SENS_MIN,Math.min(SENS_MAX,dialStartVal+(dialStartY-e.clientY)*0.06));
+  drawDial();
+});
+document.addEventListener('mouseup',()=>{dialDragging=false;});
+dialCanvas.addEventListener('touchstart',e=>{dialDragging=true;dialStartY=e.touches[0].clientY;dialStartVal=sensitivity;e.preventDefault();},{passive:false});
+document.addEventListener('touchmove',e=>{if(!dialDragging)return;sensitivity=Math.max(SENS_MIN,Math.min(SENS_MAX,dialStartVal+(dialStartY-e.touches[0].clientY)*0.06));drawDial();},{passive:false});
+document.addEventListener('touchend',()=>{dialDragging=false;});
+
+// ── Resize ─────────────────────────────────────────────────────────────────────
+function resize() {
+  W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight;
+  cx=W/2; cy=H/2;
+  freqCanvas.width=W; freqCanvas.height=60;
+  initParticles(); initFaraday();
+}
+function initParticles() {
+  particles.length=0;
+  for(let i=0;i<NUM_PARTICLES;i++){
+    const angle=Math.random()*Math.PI*2, r=Math.random()*Math.min(W,H)*0.44;
+    particles.push({x:cx+Math.cos(angle)*r,y:cy+Math.sin(angle)*r,vx:0,vy:0,size:0.5+Math.random()*1.5});
+  }
+}
+function initFaraday(){faradayGrid=new Float32Array(GRID*GRID);faradayVel=new Float32Array(GRID*GRID);}
+
+// ── Audio ──────────────────────────────────────────────────────────────────────
+async function startMic() {
+  if(!audioCtx){
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=2048;
+    dataArray=new Uint8Array(analyser.frequencyBinCount);
+    freqArray=new Uint8Array(analyser.frequencyBinCount);
+  }
+  try {
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    micActive=true;
+    badge.className='badge live';
+    badge.textContent='◉ LIVE — REACTING TO REAL SOUND';
+    applyThemeUI();
+    document.getElementById('btn-mic').textContent='◉ MIC LIVE';
+  } catch(e){alert('Microphone access denied.');}
+}
+
+function scaleVal(v){return Math.min(1,v*(sensitivity/5));}
+
+function getAudioData(){
+  if(!micActive||!analyser) return getDemoAudio();
+  analyser.getByteTimeDomainData(dataArray);
+  analyser.getByteFrequencyData(freqArray);
+  let sum=0;
+  for(let i=0;i<dataArray.length;i++){const v=(dataArray[i]-128)/128;sum+=v*v;}
+  const rawE=Math.sqrt(sum/dataArray.length);
+  const bLen=Math.floor(freqArray.length*0.1),mLen=Math.floor(freqArray.length*0.3);
+  let bass=0,mid=0,high=0;
+  for(let i=0;i<bLen;i++) bass+=freqArray[i];
+  for(let i=bLen;i<mLen;i++) mid+=freqArray[i];
+  for(let i=mLen;i<freqArray.length;i++) high+=freqArray[i];
+  bass/=bLen*255;mid/=(mLen-bLen)*255;high/=(freqArray.length-mLen)*255;
+  let mv=0,mi=0;
+  for(let i=0;i<freqArray.length;i++) if(freqArray[i]>mv){mv=freqArray[i];mi=i;}
+  const dominant=mi*(audioCtx.sampleRate/analyser.fftSize);
+  updateMeter(rawE,freqArray,true);
+  return{energy:scaleVal(rawE),bass:scaleVal(bass),mid:scaleVal(mid),high:scaleVal(high),dominant};
+}
+function getDemoAudio(){
+  const slow=Math.sin(t*0.012),fast=Math.sin(t*0.047),pulse=Math.abs(Math.sin(t*0.025));
+  updateMeter(0,null,false);
+  const s=sensitivity/5;
+  return{
+    energy:Math.min(1,(0.35+0.3*pulse+0.1*Math.abs(fast))*s),
+    bass:Math.min(1,(0.4+0.35*Math.abs(Math.sin(t*0.018)))*s),
+    mid:Math.min(1,(0.3+0.25*Math.abs(Math.sin(t*0.031)))*s),
+    high:Math.min(1,(0.2+0.2*Math.abs(Math.sin(t*0.061)))*s),
+    dominant:250+Math.abs(slow)*700
+  };
+}
+function updateMeter(energy,fData,live){
+  micBars.forEach((bar,i)=>{
+    let v=live&&fData ? (()=>{const s=Math.floor(i*fData.length/8),e=Math.floor((i+1)*fData.length/8);let sum=0;for(let j=s;j<e;j++)sum+=fData[j];return(sum/(e-s))/255;})() : Math.abs(Math.sin(t*0.055+i*0.8))*0.6;
+    const h=Math.max(2,v*20);
+    bar.style.height=h+'px';
+    if(live){
+      const hue=theme.hue(i/8,{high:v});
+      bar.style.background=theme.mono?`rgba(${Math.round(200*v)},${Math.round(200*v)},${Math.round(200*v)},0.8)`:`hsl(${hue},100%,65%)`;
+      bar.style.boxShadow=`0 0 ${h}px ${theme.primary}`;
+    } else {
+      bar.style.background=theme.mic+'88';bar.style.boxShadow='none';
+    }
+  });
+}
+
+// ── Trail background ───────────────────────────────────────────────────────────
+function drawTrail(){
+  const[r,g,b]=theme.bg;
+  ctx.fillStyle=`rgba(${r},${g},${b},${theme.trail})`;
+  ctx.fillRect(0,0,W,H);
+}
+
+// ── Chladni ────────────────────────────────────────────────────────────────────
+function chladniField(x,y,m,n,sc){
+  const nx=(x-cx)/sc,ny=(y-cy)/sc;
+  return Math.cos(m*Math.PI*nx)*Math.cos(n*Math.PI*ny)-Math.cos(n*Math.PI*nx)*Math.cos(m*Math.PI*ny);
+}
+function renderChladni(a){
+  const sc=Math.min(W,H)*0.45;
+  const m=1+Math.floor((a.dominant/800)%7),n=1+Math.floor((a.dominant/400)%5);
+  const force=0.18+a.energy*3.5+a.bass*2.5;
+  for(let p of particles){
+    const val=chladniField(p.x,p.y,m,n,sc);
+    const gx=chladniField(p.x+1,p.y,m,n,sc)-val,gy=chladniField(p.x,p.y+1,m,n,sc)-val;
+    p.vx+=-gx*force*9;p.vy+=-gy*force*9;
+    p.vx+=(Math.random()-0.5)*(0.4+a.bass*2.5);p.vy+=(Math.random()-0.5)*(0.4+a.bass*2.5);
+    p.vx*=0.91;p.vy*=0.91;p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+  }
+  for(let p of particles){
+    const val=Math.abs(chladniField(p.x,p.y,m,n,sc)),onNode=val<0.08;
+    const frac=val;
+    ctx.fillStyle=themeColor(frac,onNode?0.9:0.12+val*0.25,a);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*(onNode?1.5:0.7),0,Math.PI*2);ctx.fill();
+  }
+  ctx.save();
+  for(let x=cx-sc;x<cx+sc;x+=4) for(let y=cy-sc;y<cy+sc;y+=4){
+    const v=Math.abs(chladniField(x,y,m,n,sc));
+    if(v<0.04){ctx.fillStyle=`rgba(${nodeGlow()},${(0.04-v)/0.04*0.07})`;ctx.fillRect(x-2,y-2,4,4);}
+  }
+  ctx.restore();
+}
+
+// ── Ripple ─────────────────────────────────────────────────────────────────────
+function renderRipple(a){
+  const R=Math.min(W,H)*0.38;
+  for(let r=0;r<12;r++){
+    const rr=R*(r/12)*(1+0.3*Math.sin(t*(0.4+a.bass*2)+r*0.6));
+    ctx.beginPath();ctx.arc(cx,cy,rr,0,Math.PI*2);
+    ctx.strokeStyle=themeColor(r/12,(0.5-r/12*0.4)*(0.3+a.energy*2),a);
+    ctx.lineWidth=1+a.bass*6;ctx.stroke();
+  }
+  for(let p of particles){
+    const dx=p.x-cx,dy=p.y-cy,r=Math.max(0.1,Math.sqrt(dx*dx+dy*dy)),angle=Math.atan2(dy,dx);
+    const wave=Math.sin(r*0.05-t*(1+a.bass*3))*(1+a.energy*4);
+    const tR=R*0.5+wave*30*(1+a.mid);
+    p.vx+=(cx+Math.cos(angle)*tR-p.x)*0.015;p.vy+=(cy+Math.sin(angle)*tR-p.y)*0.015;
+    p.vx+=-dy/r*(0.3+a.mid*2);p.vy+=dx/r*(0.3+a.mid*2);
+    p.vx*=0.9;p.vy*=0.9;p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    const wv=Math.sin(Math.sqrt((p.x-cx)**2+(p.y-cy)**2)*0.05-t*(1+a.bass*3));
+    ctx.fillStyle=themeColor((wv+1)/2,0.4+Math.abs(wv)*0.4,a);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ── Lissajous ──────────────────────────────────────────────────────────────────
+function renderLissajous(a){
+  const A=Math.min(W,H)*0.38,aa=2+Math.floor(a.mid*5),b=3+Math.floor(a.high*4);
+  const delta=t*0.008+a.bass*Math.PI;
+  ctx.beginPath();
+  for(let i=0;i<=2000;i++){
+    const theta=(i/2000)*Math.PI*2;
+    const x=cx+A*Math.sin(aa*theta+delta)*(0.7+a.energy*0.5);
+    const y=cy+A*Math.sin(b*theta)*(0.7+a.energy*0.5);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  }
+  const g=ctx.createLinearGradient(cx-A,cy,cx+A,cy);
+  g.addColorStop(0,themeColor(0,0.15+a.energy*0.5,a));
+  g.addColorStop(0.5,themeColor(0.5,0.15+a.energy*0.5,a));
+  g.addColorStop(1,themeColor(1,0.15+a.energy*0.5,a));
+  ctx.strokeStyle=g;ctx.lineWidth=1+a.energy*3;ctx.stroke();
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i],theta=(i/particles.length)*Math.PI*2;
+    const tx=cx+A*Math.sin(aa*theta+delta)*(0.7+a.energy*0.5);
+    const ty=cy+A*Math.sin(b*theta)*(0.7+a.energy*0.5);
+    p.vx+=(tx-p.x)*0.08;p.vy+=(ty-p.y)*0.08;
+    p.vx*=0.85;p.vy*=0.85;p.x+=p.vx;p.y+=p.vy;
+    const dist=Math.sqrt((p.x-tx)**2+(p.y-ty)**2);
+    ctx.fillStyle=particleColor(i/particles.length,Math.max(0,0.8-dist*0.03),a);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size*1.2,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ── Faraday ────────────────────────────────────────────────────────────────────
+function renderFaraday(a){
+  const speed=0.18+a.bass*0.6,damp=0.985-a.energy*0.03,drive=0.8+a.energy*8;
+  const kx=1+Math.floor(a.mid*6),ky=1+Math.floor(a.high*4);
+  for(let gx=1;gx<GRID-1;gx++) for(let gy=1;gy<GRID-1;gy++){
+    const i=gy*GRID+gx;
+    const lap=faradayGrid[(gy-1)*GRID+gx]+faradayGrid[(gy+1)*GRID+gx]+faradayGrid[gy*GRID+gx-1]+faradayGrid[gy*GRID+gx+1]-4*faradayGrid[i];
+    faradayVel[i]+=lap*speed*speed;faradayVel[i]*=damp;
+  }
+  const driveVal=Math.sin(t*(0.08+a.bass*0.2))*drive;
+  for(let gx=1;gx<GRID-1;gx++) for(let gy=1;gy<GRID-1;gy++){
+    const i=gy*GRID+gx,nx=(gx/GRID-0.5)*2,ny=(gy/GRID-0.5)*2;
+    faradayGrid[i]+=faradayVel[i]+Math.cos(kx*Math.PI*nx)*Math.cos(ky*Math.PI*ny)*driveVal*0.01;
+    faradayGrid[i]=Math.max(-3,Math.min(3,faradayGrid[i]));
+  }
+  const cw=W/GRID,ch=H/GRID;
+  for(let gx=0;gx<GRID;gx++) for(let gy=0;gy<GRID;gy++){
+    const val=faradayGrid[gy*GRID+gx],norm=(val+3)/6;
+    ctx.fillStyle=themeColor(norm,0.15+Math.abs(val)*0.25,a,40+norm*40);
+    ctx.fillRect(gx*cw,gy*ch,cw+1,ch+1);
+  }
+  for(let p of particles){
+    const gx=Math.floor(p.x/W*GRID),gy=Math.floor(p.y/H*GRID);
+    if(gx<0||gx>=GRID||gy<0||gy>=GRID) continue;
+    const val=faradayGrid[gy*GRID+gx];
+    const gradX=gx<GRID-1?faradayGrid[gy*GRID+gx+1]-val:0;
+    const gradY=gy<GRID-1?faradayGrid[(gy+1)*GRID+gx]-val:0;
+    p.vx+=gradX*(2+a.energy*6);p.vy+=gradY*(2+a.energy*6);
+    p.vx+=(Math.random()-0.5)*0.3;p.vy+=(Math.random()-0.5)*0.3;
+    p.vx*=0.88;p.vy*=0.88;p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    ctx.fillStyle=themeColor((val+3)/6,0.4+Math.abs(val)*0.4,a);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ── Spiral ─────────────────────────────────────────────────────────────────────
+function renderSpiral(a){
+  const maxR=Math.min(W,H)*0.45,turns=5+Math.floor(a.mid*6);
+  const rotOff=t*(0.003+a.bass*0.015),arms=3+Math.floor(a.high*4);
+  for(let arm=0;arm<arms;arm++){
+    const armOff=(arm/arms)*Math.PI*2;
+    ctx.beginPath();
+    for(let i=0;i<=4000;i++){
+      const frac=i/4000,theta=frac*turns*Math.PI*2+rotOff+armOff;
+      const r=frac*maxR*(0.8+a.energy*0.4)*(1+0.15*Math.sin(frac*20*Math.PI+t*0.05+a.bass*5));
+      i===0?ctx.moveTo(cx+Math.cos(theta)*r,cy+Math.sin(theta)*r):ctx.lineTo(cx+Math.cos(theta)*r,cy+Math.sin(theta)*r);
+    }
+    ctx.strokeStyle=themeColor(arm/arms,0.3+a.energy*0.5,a);
+    ctx.lineWidth=0.8+a.bass*2.5;ctx.stroke();
+  }
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i],frac=((i/particles.length)+(t*0.0003))%1;
+    const theta=frac*turns*Math.PI*2+rotOff;
+    const r=frac*maxR*(0.8+a.energy*0.4)*(1+0.15*Math.sin(frac*20*Math.PI+t*0.05+a.bass*5));
+    const tx=cx+Math.cos(theta)*r,ty=cy+Math.sin(theta)*r;
+    p.vx+=(tx-p.x)*0.12;p.vy+=(ty-p.y)*0.12;
+    p.vx*=0.82;p.vy*=0.82;p.x+=p.vx;p.y+=p.vy;
+    const dist=Math.sqrt((p.x-tx)**2+(p.y-ty)**2);
+    ctx.fillStyle=particleColor(frac,Math.max(0,0.85-dist*0.04),a);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ── Polar ──────────────────────────────────────────────────────────────────────
+function renderPolar(a){
+  const maxR=Math.min(W,H)*0.42,k=2+Math.floor(a.dominant/120%12);
+  for(let l=0;l<4;l++){
+    const kk=k+l,tOff=t*(0.004+l*0.002)+a.bass*l*0.5;
+    ctx.beginPath();
+    for(let i=0;i<=3000;i++){
+      const theta=(i/3000)*Math.PI*2*Math.ceil(kk/2);
+      const rMod=maxR*Math.abs(Math.cos(kk*theta))*(0.7+a.energy*0.5+0.1*Math.sin(theta*3+tOff));
+      ctx.lineTo(cx+Math.cos(theta+tOff)*rMod,cy+Math.sin(theta+tOff)*rMod);
+    }
+    ctx.strokeStyle=themeColor(l/4,0.4-l*0.07,a);
+    ctx.lineWidth=1.5-l*0.2;ctx.stroke();
+  }
+  const tOff=t*0.004;
+  ctx.beginPath();
+  for(let i=0;i<=3000;i++){
+    const theta=(i/3000)*Math.PI*2*Math.ceil(k/2);
+    const rMod=maxR*Math.abs(Math.cos(k*theta))*(0.7+a.energy*0.5);
+    i===0?ctx.moveTo(cx+Math.cos(theta+tOff)*rMod,cy+Math.sin(theta+tOff)*rMod):ctx.lineTo(cx+Math.cos(theta+tOff)*rMod,cy+Math.sin(theta+tOff)*rMod);
+  }
+  const gfill=ctx.createRadialGradient(cx,cy,0,cx,cy,maxR);
+  gfill.addColorStop(0,themeColor(0,0.06+a.energy*0.1,a));
+  gfill.addColorStop(1,'transparent');
+  ctx.fillStyle=gfill;ctx.fill();
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i],theta=(i/particles.length)*Math.PI*2*Math.ceil(k/2)+tOff;
+    const rMod=maxR*Math.abs(Math.cos(k*theta))*(0.7+a.energy*0.5);
+    const tx=cx+Math.cos(theta+tOff)*rMod,ty=cy+Math.sin(theta+tOff)*rMod;
+    p.vx+=(tx-p.x)*0.09+(Math.random()-0.5)*(0.2+a.bass*1.5);
+    p.vy+=(ty-p.y)*0.09+(Math.random()-0.5)*(0.2+a.bass*1.5);
+    p.vx*=0.84;p.vy*=0.84;p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+    const dist=Math.sqrt((p.x-tx)**2+(p.y-ty)**2);
+    ctx.fillStyle=particleColor(i/particles.length,Math.max(0,0.85-dist*0.04),a);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  }
+}
+
+// ── Freq bar ───────────────────────────────────────────────────────────────────
+function drawFreqBar(){
+  fctx.clearRect(0,0,W,60);
+  if(!freqArray||!micActive) return;
+  const bw=W/freqArray.length*3;
+  for(let i=0;i<freqArray.length/3;i++){
+    const v=freqArray[i]/255;
+    const hue=theme.hue(i/(freqArray.length/3),{high:v});
+    fctx.fillStyle=theme.mono?`rgba(${Math.round(200*v)},${Math.round(200*v)},${Math.round(200*v)},${v*0.8})`:`hsla(${hue},100%,60%,${v*0.8})`;
+    fctx.fillRect(i*bw,60-v*55,bw-0.5,v*55);
+  }
+}
+
+// ── Main loop ──────────────────────────────────────────────────────────────────
+function loop(){
+  requestAnimationFrame(loop);
+  t++;
+  const audio=getAudioData();
+  if(mode==='faraday') ctx.clearRect(0,0,W,H);
+  else drawTrail();
+  if(mode==='chladni')    renderChladni(audio);
+  else if(mode==='ripple')    renderRipple(audio);
+  else if(mode==='lissajous') renderLissajous(audio);
+  else if(mode==='faraday')   renderFaraday(audio);
+  else if(mode==='spiral')    renderSpiral(audio);
+  else if(mode==='polar')     renderPolar(audio);
+  drawFreqBar();
+  document.getElementById('stat-freq').textContent=Math.round(audio.dominant);
+  document.getElementById('stat-amp').textContent=(audio.energy*100).toFixed(1)+'%';
+}
+
+// ── UI ─────────────────────────────────────────────────────────────────────────
+document.addEventListener('mousemove', e=>{
+  const c=document.getElementById('cursor');
+  c.style.left=e.clientX+'px';c.style.top=e.clientY+'px';
+});
+
+function setMode(m){
+  mode=m;
+  document.getElementById('stat-mode').textContent=m.toUpperCase();
+  ['chladni','ripple','lissajous','faraday','spiral','polar'].forEach(id=>{
+    const btn=document.getElementById('btn-'+id);
+    btn.classList.toggle('active',id===m);
+    btn.style.boxShadow=id===m?`0 0 22px ${theme.primary}88`:`0 0 8px ${theme.primary}22`;
+  });
+  initParticles();
+  if(m==='faraday') initFaraday();
+}
+
+document.getElementById('btn-mic').addEventListener('click', startMic);
+['chladni','ripple','lissajous','faraday','spiral','polar'].forEach(id=>{
+  document.getElementById('btn-'+id).addEventListener('click',()=>setMode(id));
+});
+['neon','fire','ocean','mono','aurora'].forEach(name=>{
+  document.getElementById('th-'+name).addEventListener('click',()=>setTheme(name));
+});
+
+window.addEventListener('resize', resize);
+resize();
+applyThemeUI();
+drawDial();
+loop();
+</script>
+</body>
+</html>

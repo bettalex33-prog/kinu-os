@@ -306,7 +306,7 @@ export default function App() {
       <nav style={styles.nav}>
         <div style={styles.logo}>🤖 KINU OS</div>
         <div style={styles.navTabs}>
-          {['home', 'chat', 'missions', 'themes'].map(t => (
+          {['home', 'chat', 'missions', 'visualizer', 'themes'].map(t => (
             <button key={t} style={styles.navTab(tab === t)} onClick={() => setTab(t)}>
               {t.toUpperCase()}
             </button>
@@ -399,6 +399,17 @@ export default function App() {
                 <span style={{ color: colors.primary, fontSize: '12px' }}>+{m.xp} XP</span>
               </div>
             ))}
+          </div>
+        )}
+        
+        {/* VISUALIZER */}
+        {tab === 'visualizer' && (
+          <div style={{ borderRadius: '12px', overflow: 'hidden', height: '600px', border: '1px solid #222' }}>
+            <iframe
+              src="/visualizer.html"
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="CYMATICS Visualizer"
+            />
           </div>
         )}
 
