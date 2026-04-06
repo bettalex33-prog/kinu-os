@@ -1,0 +1,22 @@
+{
+  "name": "kinu-os",
+  "version": "1.0.0",
+  "description": "KINU OS - Personal AI Operating System",
+  "main": "main.js",
+  "scripts": {
+    "dev": "npx vite",
+    "build": "npx vite build",
+    "electron": "npx electron .",
+    "start": "npx concurrently \"npm run dev\" \"npm run electron\""
+  },
+  "author": "Alex Kinuthia",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.4"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  }
+}
