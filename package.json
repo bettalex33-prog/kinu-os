@@ -6,17 +6,42 @@
   "scripts": {
     "dev": "npx vite",
     "build": "npx vite build",
-    "electron": "npx electron .",
-    "start": "npx concurrently \"npm run dev\" \"npm run electron\""
+    "electron": "electron .",
+    "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "dist": "npm run build && electron-builder",
+    "dist-mac": "npm run build && electron-builder --mac"
   },
   "author": "Alex Kinuthia",
   "license": "MIT",
   "devDependencies": {
-    "@vitejs/plugin-react": "^6.0.1",
-    "vite": "^8.0.4"
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.0.0",
+    "electron": "^36.0.0",
+    "electron-builder": "^25.0.0",
+    "vite": "^8.0.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.alexkinuthia.kinu-os",
+    "productName": "KINU OS",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "public/icon.png"
+    },
+    "win": {
+      "icon": "public/icon.png"
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "preload.js"
+    ],
+    "directories": {
+      "output": "release"
+    }
   },
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
   }
 }

@@ -94,7 +94,7 @@ const [xpHistory, setXpHistory] = useState(() => {
     completeMission(1)
 
     try {
-      const res = await fetch('https://kinu-web-production.up.railway.app/chat', {
+      const res = await fetch('http://127.0.0.1:5000/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMsg, history: [] })
@@ -425,7 +425,7 @@ const [xpHistory, setXpHistory] = useState(() => {
         {tab === 'visualizer' && (
           <div style={{ borderRadius: '12px', overflow: 'hidden', height: '600px', border: '1px solid #222' }}>
             <iframe
-              src="/visualizer.html"
+              src={window.location.protocol === 'file:' ? './visualizer.html' : '/visualizer.html'}
               style={{ width: '100%', height: '100%', border: 'none' }}
               title="CYMATICS Visualizer"
             />
