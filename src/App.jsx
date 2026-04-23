@@ -31,6 +31,12 @@ export default function App() {
   const [xp, setXp] = useState(() => Number(localStorage.getItem('kinu_xp') || 0))
   const [streak, setStreak] = useState(() => Number(localStorage.getItem('kinu_streak') || 1))
   const [mood, setMood] = useState(null)
+  const [moodHistory, setMoodHistory] = useState(() => {
+  try { return JSON.parse(localStorage.getItem('kinu_mood_history') || '[]') } catch { return [] }
+})
+const [xpHistory, setXpHistory] = useState(() => {
+  try { return JSON.parse(localStorage.getItem('kinu_xp_history') || '[]') } catch { return [] }
+})
   const [missions, setMissions] = useState(MISSIONS)
   const [chatInput, setChatInput] = useState('')
   const [messages, setMessages] = useState([
@@ -47,7 +53,16 @@ export default function App() {
     localStorage.setItem('kinu_xp', xp)
   }, [xp])
 
-  const addXp = (amount) => setXp(prev => prev + amount)
+  const addXp = (amount) => {
+    setXp(prev => {
+      const newXp = prev + amount
+      const entry = { xp: newXp, time: new Date().toISOString() }
+      const hist = [...xpHistory, entry].slice(-50)
+      setXpHistory(hist)
+      localStorage.setItem('kinu_xp_history', JSON.stringify(hist))
+      return newXp
+    })
+  }
 
   const completeMission = (id) => {
     setMissions(prev => prev.map(m => {
@@ -63,6 +78,10 @@ export default function App() {
     setMood(m)
     addXp(20)
     completeMission(2)
+    const entry = { mood: m.label, emoji: m.emoji, time: new Date().toISOString() }
+    const updated = [...moodHistory, entry].slice(-30)
+    setMoodHistory(updated)
+    localStorage.setItem('kinu_mood_history', JSON.stringify(updated))
   }
 
   const sendMessage = async () => {
@@ -306,7 +325,7 @@ export default function App() {
       <nav style={styles.nav}>
         <div style={styles.logo}>🤖 KINU OS</div>
         <div style={styles.navTabs}>
-          {['home', 'chat', 'missions', 'visualizer', 'themes'].map(t => (
+          {['home', 'chat', 'missions', 'visualizer', 'brain', 'themes'].map(t => (
             <button key={t} style={styles.navTab(tab === t)} onClick={() => setTab(t)}>
               {t.toUpperCase()}
             </button>
@@ -412,6 +431,80 @@ export default function App() {
             />
           </div>
         )}
+
+        {/* BRAIN ROOM */}
+{tab === 'brain' && (
+  <div>
+    <div style={{...styles.card, marginBottom: '16px'}}>
+      <div style={styles.cardTitle}>🧠 Brain Room — Your Stats</div>
+      <div style={styles.grid}>
+        <div style={{textAlign:'center'}}>
+          <div style={styles.statBig}>{level}</div>
+          <div style={{color:'#666', fontSize:'12px'}}>Current Level</div>
+        </div>
+        <div style={{textAlign:'center'}}>
+          <div style={styles.statBig}>{xp}</div>
+          <div style={{color:'#666', fontSize:'12px'}}>Total XP</div>
+        </div>
+        <div style={{textAlign:'center'}}>
+          <div style={styles.statBig}>🔥{streak}</div>
+          <div style={{color:'#666', fontSize:'12px'}}>Day Streak</div>
+        </div>
+        <div style={{textAlign:'center'}}>
+          <div style={styles.statBig}>{missions.filter(m=>m.done).length}/{missions.length}</div>
+          <div style={{color:'#666', fontSize:'12px'}}>Missions Done</div>
+        </div>
+      </div>
+    </div>
+
+    <div style={{...styles.card, marginBottom: '16px'}}>
+      <div style={styles.cardTitle}>😊 Mood History</div>
+      {moodHistory.length === 0 ? (
+        <div style={{color:'#666', fontSize:'13px'}}>No mood logs yet — log your mood on the home tab!</div>
+      ) : (
+        <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>
+          {moodHistory.slice(-10).reverse().map((m, i) => (
+            <div key={i} style={{
+              background:'#1a1a1a', border:'1px solid #333',
+              borderRadius:'8px', padding:'8px 12px', fontSize:'12px'
+            }}>
+              <div style={{fontSize:'20px'}}>{m.emoji}</div>
+              <div style={{color:'#999'}}>{m.mood}</div>
+              <div style={{color:'#555', fontSize:'10px'}}>
+                {new Date(m.time).toLocaleDateString()}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <div style={styles.card}>
+      <div style={styles.cardTitle}>📈 XP Progress</div>
+      {xpHistory.length === 0 ? (
+        <div style={{color:'#666', fontSize:'13px'}}>No XP history yet — complete missions to earn XP!</div>
+      ) : (
+        <div style={{display:'flex', alignItems:'flex-end', gap:'4px', height:'100px'}}>
+          {xpHistory.slice(-20).map((entry, i, arr) => {
+            const max = Math.max(...arr.map(e => e.xp))
+            const height = Math.max(8, (entry.xp / max) * 90)
+            return (
+              <div key={i} style={{
+                flex:1, height:`${height}px`,
+                background: colors.primary,
+                borderRadius:'3px 3px 0 0',
+                opacity: 0.4 + (i/arr.length * 0.6)
+              }} title={`${entry.xp} XP`}/>
+            )
+          })}
+        </div>
+      )}
+      <div style={{marginTop:'8px', fontSize:'11px', color:'#666'}}>
+        Last {Math.min(xpHistory.length, 20)} XP snapshots
+      </div>
+    </div>
+  </div>
+)}
 
         {/* THEMES */}
         {tab === 'themes' && (
